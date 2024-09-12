@@ -1,6 +1,9 @@
-const cors = require('cors');
-const { createCorsMiddleware } = require('netlify-cors');
+// netlify/functions/analyze.js
 
+const { json } = require('micro');
+const { send } = require('micro');
+
+// Sample data
 const sampleTableData = [
   { id: 1, product: 'Widget A', sales: 120 },
   { id: 2, product: 'Widget B', sales: 150 },
@@ -16,36 +19,31 @@ const sampleGraphData = {
 
 const query = `SELECT * FROM sample WHERE description = 'filter'`;
 
-exports.handler = async function(event, context) {
-  try {
-    const corsHandler = createCorsMiddleware();
-    const headers = corsHandler(event.headers);
+module.exports = async (req, res) => {
+  // Handle CORS
+  res.setHeader('Access-Control-Allow-Origin', 'https://aiconductor.netlify.app');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-    if (event.httpMethod === 'POST') {
-      const { dataset, description } = JSON.parse(event.body);
+  if (req.method === 'OPTIONS') {
+    // Respond to preflight requests
+    return send(res, 200);
+  }
 
-      return {
-        statusCode: 200,
-        headers,
-        body: JSON.stringify({
-          tableHeaders: sampleTableHeaders,
-          tableData: sampleTableData,
-          graphData: sampleGraphData,
-          query
-        })
-      };
+  if (req.method === 'POST') {
+    try {
+      const { dataset, description } = await json(req);
+      // Return dynamic data
+      send(res, 200, {
+        tableHeaders: sampleTableHeaders,
+        tableData: sampleTableData,
+        graphData: sampleGraphData,
+        query
+      });
+    } catch (error) {
+      send(res, 500, { message: 'Internal Server Error' });
     }
-
-    return {
-      statusCode: 405,
-      headers,
-      body: JSON.stringify({ error: 'Method Not Allowed' })
-    };
-  } catch (error) {
-    return {
-      statusCode: 500,
-      headers,
-      body: JSON.stringify({ error: 'Internal Server Error' })
-    };
+  } else {
+    send(res, 405, { message: 'Method Not Allowed' });
   }
 };

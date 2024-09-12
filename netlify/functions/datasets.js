@@ -1,26 +1,33 @@
-const cors = require('cors');
-const { createCorsMiddleware } = require('netlify-cors');
+// netlify/functions/datasets.js
 
+const { send } = require('micro');
+
+// Sample datasets
 const datasets = [
   { id: 1, name: 'Sales Data' },
   { id: 2, name: 'Customer Feedback' },
   { id: 3, name: 'Product Inventory' }
 ];
 
-exports.handler = async function(event, context) {
-  try {
-    const corsHandler = createCorsMiddleware();
-    const headers = corsHandler(event.headers);
+module.exports = async (req, res) => {
+  // Handle CORS
+  res.setHeader('Access-Control-Allow-Origin', 'https://aiconductor.netlify.app');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-    return {
-      statusCode: 200,
-      headers,
-      body: JSON.stringify(datasets)
-    };
-  } catch (error) {
-    return {
-      statusCode: 500,
-      body: JSON.stringify({ error: 'Internal Server Error' })
-    };
+  if (req.method === 'OPTIONS') {
+    // Respond to preflight requests
+    return send(res, 200);
+  }
+
+  if (req.method === 'GET') {
+    try {
+      // Return datasets
+      send(res, 200, datasets);
+    } catch (error) {
+      send(res, 500, { message: 'Internal Server Error' });
+    }
+  } else {
+    send(res, 405, { message: 'Method Not Allowed' });
   }
 };
