@@ -1,5 +1,3 @@
-// netlify/functions/analyze.js
-
 const { json } = require('micro');
 const { send } = require('micro');
 
@@ -21,7 +19,7 @@ const query = `SELECT * FROM sample WHERE description = 'filter'`;
 
 module.exports = async (req, res) => {
   // Handle CORS
-  res.setHeader('Access-Control-Allow-Origin', 'https://aiconductor.netlify.app');
+  res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
@@ -41,6 +39,7 @@ module.exports = async (req, res) => {
         query
       });
     } catch (error) {
+      console.error('Error processing request:', error);
       send(res, 500, { message: 'Internal Server Error' });
     }
   } else {

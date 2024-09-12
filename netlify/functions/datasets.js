@@ -11,7 +11,7 @@ const datasets = [
 
 module.exports = async (req, res) => {
   // Handle CORS
-  res.setHeader('Access-Control-Allow-Origin', 'https://aiconductor.netlify.app');
+  res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
@@ -25,6 +25,7 @@ module.exports = async (req, res) => {
       // Return datasets
       send(res, 200, datasets);
     } catch (error) {
+      console.error('Error processing request:', error);
       send(res, 500, { message: 'Internal Server Error' });
     }
   } else {
