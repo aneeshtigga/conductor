@@ -21,14 +21,14 @@ function App() {
 
   // Fetch datasets dynamically
   useEffect(() => {
-    axios.get('http://localhost:4000/api/datasets')
+    axios.get('/.netlify/functions/analyze')
       .then(response => setDatasets(response.data))
       .catch(error => console.error('Error fetching datasets:', error));
   }, []);
 
   // Handle form submission
   const handleSubmit = () => {
-    axios.post('http://localhost:4000/api/analyze', {
+    axios.post('/.netlify/functions/analyze', {
       dataset: selectedDataset,
       description: analyticsDesc
     })
