@@ -98,8 +98,6 @@ function App() {
     .finally(() => setIsLoading(false)); // Reset loading state after API call
   };
 
-  console.log(tableData)
-
 
   const downloadTableAsCSV = () => {
     const header = tableHeaders.join(',');
@@ -205,8 +203,8 @@ ${rows}`;
 
       <div className="flex-1 overflow-auto" style={{ marginLeft: `${sidebarWidth + 5}px` }}>
         <div className="flex justify-center items-center mb-6 mt-6">
-          <img src={logo} alt="App Logo" className="h-10 w-10 mr-2" />
-          <h1 className="text-3xl font-bold text-blue-600">Data Insights</h1>
+          <img src={logo} alt="App Logo" className="h-8 w-8 mr-4" />
+          <h1 className="text-3xl font-bold text-blue-800">Data Insights</h1>
         </div>
 
         <div className="chat-messages space-y-10 pb-32 ml-32 mr-32"> 
