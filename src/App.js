@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Line } from 'react-chartjs-2';
+import { Line, Bar } from 'react-chartjs-2';
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, BarElement, Title, Tooltip, Legend } from 'chart.js';
 import html2canvas from 'html2canvas';
 import logo from './stars.svg';
@@ -109,6 +109,8 @@ function App() {
     window.removeEventListener('mousemove', resizing);
     window.removeEventListener('mouseup', stopResizing);
   };
+
+  const val = Bar;
 
   return (
     <div className="flex">
