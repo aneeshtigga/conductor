@@ -1,43 +1,62 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Line } from 'react-chartjs-2';
-import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend } from 'chart.js';
-import logo from './stars.svg';
+import { Line, Bar } from 'react-chartjs-2';
+import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, BarElement, Title, Tooltip, Legend } from 'chart.js';
 import html2canvas from 'html2canvas';
+import logo from './stars.svg';
 import { saveAs } from 'file-saver';
 
-// Register components needed for the chart
-ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend);
+ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, Title, Tooltip, Legend);
 
 function App() {
   const [datasets, setDatasets] = useState([]);
-  const [selectedDataset, setSelectedDataset] = useState('');
+  const [selectedDatasets, setSelectedDatasets] = useState([]);
   const [analyticsDesc, setAnalyticsDesc] = useState('');
+  const [messages, setMessages] = useState([]); // Chat-style messages state
+  const [lastQuery, setLastQuery] = useState('');
   const [tableHeaders, setTableHeaders] = useState([]);
   const [tableData, setTableData] = useState([]);
-  const [graphLabels, setGraphLabels] = useState([]);
-  const [graphDataset, setGraphDataset] = useState([]);
-  const [query, setQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isFullScreen, setIsFullScreen] = useState(false);
+  const [sidebarWidth, setSidebarWidth] = useState(300);
 
   // Fetch datasets dynamically
   useEffect(() => {
-    axios.get('/.netlify/functions/analyze')
+    axios.get('http://localhost:4000/api/datasets')
       .then(response => setDatasets(response.data))
       .catch(error => console.error('Error fetching datasets:', error));
   }, []);
 
+  // Toggle dataset selection
+  const toggleDataset = (dataset) => {
+    if (selectedDatasets.includes(dataset)) {
+      setSelectedDatasets(selectedDatasets.filter(d => d !== dataset));
+    } else {
+      setSelectedDatasets([...selectedDatasets, dataset]);
+    }
+  };
+
   // Handle form submission
   const handleSubmit = () => {
-    axios.post('/.netlify/functions/analyze', {
-      dataset: selectedDataset,
-      description: analyticsDesc
+    axios.post('http://localhost:4000/api/analyze', {
+      datasets: selectedDatasets,
+      description: analyticsDesc,
+      query: lastQuery
     })
     .then(response => {
+      // Add a new message to the chat-style UI
+      const newMessage = {
+        query: response.data.query,
+        tableHeaders: response.data.tableHeaders,
+        tableData: response.data.tableData,
+        graphLabels: response.data.graphData.labels,
+        graphDataset: response.data.graphData.datasets
+      };
+      setMessages([...messages, newMessage]); // Append the new message to the list
       setTableHeaders(response.data.tableHeaders);
       setTableData(response.data.tableData);
-      setGraphLabels(response.data.graphData.labels);
-      setGraphDataset(response.data.graphData.data);
-      setQuery(response.data.query);
+      setAnalyticsDesc(''); // Clear the prompt input after submit
+      setLastQuery(response.data.query);
     })
     .catch(error => console.error('Error analyzing data:', error));
   };
@@ -66,132 +85,178 @@ function App() {
 
   // Copy query to clipboard
   const copyQueryToClipboard = () => {
-    navigator.clipboard.writeText(query)
+    navigator.clipboard.writeText(lastQuery)
       .then(() => alert('Query copied to clipboard!'))
       .catch(err => console.error('Failed to copy query: ', err));
   };
 
+  // Filter datasets based on search query
+  const filteredDatasets = datasets.filter(dataset =>
+    dataset.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  // Handlers for resizing
+  const startResizing = (e) => {
+    window.addEventListener('mousemove', resizing);
+    window.addEventListener('mouseup', stopResizing);
+  };
+
+  const resizing = (e) => {
+    setSidebarWidth(e.clientX);
+  };
+
+  const stopResizing = (e) => {
+    window.removeEventListener('mousemove', resizing);
+    window.removeEventListener('mouseup', stopResizing);
+  };
+
   return (
-    <div className="container mx-auto p-6">
-      <div className="flex justify-center items-center mb-6">
-        <img src={logo} alt="App Logo" className="h-10 w-10" />
-        <h1 className="text-3xl font-bold">Conductor</h1>
-      </div>
-
-      {/* Dataset Dropdown */}
-      <div className="flex justify-center mb-4">
-        <select
-          value={selectedDataset}
-          onChange={e => setSelectedDataset(e.target.value)}
-          className="border border-gray-300 rounded-md p-2 w-64"
-        >
-          <option value="">Select a Dataset</option>
-          {datasets.map(dataset => (
-            <option key={dataset.id} value={dataset.name}>{dataset.name}</option>
-          ))}
-        </select>
-      </div>
-
-      {/* Analytics Description Input */}
-      <div className="flex justify-center mb-4">
+    <div className="flex">
+      {/* Sidebar for selecting datasets */}
+      <div
+        className="h-screen bg-gray-200 text-black p-4 overflow-y-auto fixed"
+        style={{ width: sidebarWidth }}
+      >
+        <h2 className="text-1xl font-bold mb-4">Datasets</h2>
         <input
           type="text"
-          placeholder="Enter analytics description"
-          value={analyticsDesc}
-          onChange={e => setAnalyticsDesc(e.target.value)}
-          className="border border-gray-300 rounded-md p-2 w-64"
+          placeholder="Search by Name"
+          value={searchQuery}
+          onChange={e => setSearchQuery(e.target.value)}
+          className="border border-gray-200 rounded-md p-2 w-full mb-4"
         />
+        <ul>
+          {filteredDatasets.map(dataset => (
+            <li
+              key={dataset.id}
+              className={`p-2 mb-2 cursor-pointer rounded-md select-none ${selectedDatasets.includes(dataset.name) ? 'bg-gray-400' : 'bg-gray-300 hover:bg-gray-400'}`}
+              onClick={() => toggleDataset(dataset.name)}
+              style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
+            >
+              {dataset.name}
+            </li>
+          ))}
+        </ul>
       </div>
 
-      {/* Submit Button */}
-      <div className="flex justify-center mb-8">
-        <button
-          onClick={handleSubmit}
-          className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-md"
-        >
-          Submit
-        </button>
-      </div>
+      <div
+        className="resizer bg-gray-300 custom-resize h-screen fixed select-none"
+        onMouseDown={startResizing}
+        style={{ width: '5px', marginLeft: sidebarWidth }}
+      ></div>
 
-      {/* Table Data Display */}
-      <div className="overflow-x-auto mb-8">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-bold">Table Data</h2>
-          <i
-            className="fas fa-download text-gray-600 cursor-pointer"
-            onClick={downloadTableAsCSV}
-            title="Download Table as CSV"
-          />
+      {/* Main content area as chat-style */}
+      <div className="flex-1 p-6 overflow-auto chat-container" style={{marginLeft: `${sidebarWidth + 5}px` }}>
+        <div className="flex justify-center items-center mb-6">
+          <img src={logo} alt="App Logo" className="h-10 w-10" />
+          <h1 className="text-3xl font-bold">Data Insights</h1>
         </div>
-        <table className="min-w-full bg-white border border-gray-300 rounded-md">
-          <thead className="bg-gray-200 text-gray-600">
-            <tr>
-              {tableHeaders.map((header, index) => (
-                <th key={index} className="py-2 px-4 border-b">{header}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {tableData.map((row, rowIndex) => (
-              <tr key={rowIndex} className="text-center">
-                {Object.values(row).map((value, colIndex) => (
-                  <td key={colIndex} className="py-2 px-4 border-b">{value}</td>
-                ))}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
 
-      {/* Layout for Query Box and Graph Data */}
-      <div className="flex flex-col md:flex-row gap-6 mb-8">
-        {/* Query Display */}
-        {query && (
-          <div className="flex-1 max-h-[calc(100vh-400px)] overflow-y-auto">
-            <div className="flex justify-between items-center mb-2">
-              <h2 className="text-xl font-bold">SQL Query</h2>
+        {/* Chat Messages */}
+        <div className="chat-messages space-y-4 mb-8">
+        {messages.map((message, index) => (
+          <div key={index} className="p-4 bg-gray-100 rounded-md">
+            {/* Graph Section */}
+            <div className="flex justify-between items-center mb-4 mt-4">
+              <h3 className="text-lg font-semibold">Graph</h3>
               <i
-                className="fas fa-copy text-gray-600 cursor-pointer"
-                onClick={copyQueryToClipboard}
-                title="Copy Query to Clipboard"
+                className="fas fa-download text-gray-600 cursor-pointer hover:text-blue-500"
+                onClick={downloadGraphAsImage}
+                title="Download Graph as PNG"
               />
             </div>
-            <pre className="bg-gray-100 p-4 rounded-md border border-gray-300 overflow-x-auto">
-              {query}
-            </pre>
-          </div>
-        )}
+            <div className="chart-container h-96">
+              {message.graphLabels.length > 0 && message.graphDataset.length > 0 && (
+                <Line
+                  data={{
+                    labels: message.graphLabels,
+                    datasets: message.graphDataset
+                  }}
+                  options={{
+                    responsive: true,
+                    maintainAspectRatio: false
+                  }}
+                />
+              )}
+            </div>
 
-        {/* Graph Data Display */}
-        <div className="flex-1 max-h-[calc(100vh-400px)] overflow-y-auto">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-bold">Graph Data</h2>
-            <i
-              className="fas fa-download text-gray-600 cursor-pointer"
-              onClick={downloadGraphAsImage}
-              title="Download Graph as PNG"
-            />
-          </div>
-          <div className="chart-container h-96 max-h-full">
-            {graphLabels.length > 0 && graphDataset.length > 0 && (
-              <Line
-                data={{
-                  labels: graphLabels,
-                  datasets: [{
-                    label: 'Sample Data',
-                    data: graphDataset,
-                    borderColor: 'rgba(75,192,192,1)',
-                    backgroundColor: 'rgba(75,192,192,0.2)',
-                    fill: true
-                  }]
-                }}
-                options={{
-                  responsive: true,
-                  maintainAspectRatio: false
-                }}
+            {/* Table Section */}
+            <div className="flex justify-between items-center mb-4 mt-4">
+              <h3 className="text-lg font-semibold">Table Data</h3>
+              <i
+                className="fas fa-file-export text-gray-600 cursor-pointer hover:text-blue-500"
+                onClick={downloadTableAsCSV}
+                title="Export Table as CSV"
               />
-            )}
+            </div>
+            <div style={{ overflowX: 'auto' }}>
+              <table className="min-w-full bg-white border border-gray-300 rounded-md mb-4">
+                <thead className="bg-gray-200 text-gray-600">
+                  <tr>
+                    {message.tableHeaders.map((header, i) => (
+                      <th key={i} className="py-2 px-4 border-b">{header}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {message.tableData.map((row, rowIndex) => (
+                    <tr key={rowIndex} className="text-center">
+                      {Object.values(row).map((value, colIndex) => (
+                        <td key={colIndex} className="py-2 px-4 border-b">{value}</td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Query Section */}
+            <div className={`flex-1 overflow-y-auto ${isFullScreen ? 'fixed inset-0 bg-white z-50 p-8' : 'max-h-[calc(100vh-400px)]'}`}>
+              <div className="flex justify-between items-center mb-4  mt-4">
+                <h3 className="text-lg font-semibold">Query</h3>
+                <div className="flex items-center space-x-2">
+                  <i
+                    className="fas fa-copy text-gray-600 cursor-pointer hover:text-blue-500"
+                    onClick={copyQueryToClipboard}
+                    title="Copy Query to Clipboard"
+                  />
+                  <button
+                    onClick={() => setIsFullScreen(!isFullScreen)}
+                    className="text-gray-600 underline hover:text-blue-500"
+                  >
+                    {isFullScreen ? <i className="fa-solid fa-compress" title="Collapse"/> : <i className="fa-solid fa-expand" title="Fullscreen"/>}
+                  </button>
+                </div>
+              </div>
+              <pre className={`bg-gray-100 p-4 rounded-md border border-gray-300 overflow-x-auto overflow-y-auto ${isFullScreen ? 'max-h-100' : 'max-h-96'}`}>
+                {message.query}
+              </pre>
+            </div>
           </div>
+        ))}
+      </div>
+
+
+        {/* Input for description */}
+        <div className="input-container flex justify-center mb-8">
+          <input
+            type="text"
+            placeholder="Enter query and Shift+Enter to submit"
+            value={analyticsDesc}
+            onChange={e => setAnalyticsDesc(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && e.shiftKey) {
+                handleSubmit();
+              }
+            }}
+            className="border border-gray-300 rounded-md p-2 flex-grow"
+          />
+          <button
+            onClick={handleSubmit}
+            className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-md ml-2"
+          >
+            Submit
+          </button>
         </div>
       </div>
     </div>

@@ -1,3 +1,36 @@
+@font-face {
+  font-family: 'CentraNo2';
+  src: url('./fonts/CentraNo2-Bold.ttf') format('ttf');
+  font-weight: normal;
+  font-style: normal;
+}
+
+body {
+  font-family: 'CentraNo2', sans-serif;
+}
+
+.chat-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+.chat-messages {
+  flex-grow: 1;
+  overflow-y: auto;
+  padding-bottom: 60px; /* To make space for the input box */
+}
+
+.input-container {
+  position: fixed;
+  bottom: 0;
+  width: calc(100% - 300px); /* Adjust according to the sidebar width */
+  display: flex;
+  padding: 10px;
+  background-color: white;
+  border-top: 1px solid #e0e0e0;
+}
+
 .App {
   text-align: center;
 }

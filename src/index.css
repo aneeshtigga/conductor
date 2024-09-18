@@ -11,3 +11,7 @@ code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
     monospace;
 }
+
+.custom-resize {
+  cursor: col-resize !important; /* Overwrites col-resize */
+}
