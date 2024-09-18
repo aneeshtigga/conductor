@@ -1,12 +1,33 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
-import { Line, Bar } from 'react-chartjs-2';
-import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, BarElement, Title, Tooltip, Legend } from 'chart.js';
+import { Line } from 'react-chartjs-2';
+import { 
+  Chart as ChartJS, 
+  CategoryScale, 
+  LinearScale, 
+  PointElement, 
+  LineElement, 
+  BarElement, 
+  BarController, // Import BarController
+  Title, 
+  Tooltip, 
+  Legend 
+} from 'chart.js';
 import html2canvas from 'html2canvas';
 import logo from './stars.svg';
 import { saveAs } from 'file-saver';
 
-ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, Title, Tooltip, Legend);
+ChartJS.register(
+  CategoryScale, 
+  LinearScale, 
+  PointElement, 
+  LineElement, 
+  BarElement, 
+  BarController, // Register BarController
+  Title, 
+  Tooltip, 
+  Legend
+);
 
 function App() {
   const [datasets, setDatasets] = useState([]);
@@ -20,6 +41,7 @@ function App() {
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(300);
 
+  const lastMessageRef = useRef(null);
   // Fetch datasets dynamically
   useEffect(() => {
     axios.get('http://localhost:4000/api/datasets')
@@ -43,22 +65,31 @@ function App() {
       description: analyticsDesc,
       query: lastQuery
     })
-    .then(response => {
-      // Add a new message to the chat-style UI
-      const newMessage = {
-        query: response.data.query,
-        tableHeaders: response.data.tableHeaders,
-        tableData: response.data.tableData,
-        graphLabels: response.data.graphData.labels,
-        graphDataset: response.data.graphData.datasets
-      };
-      setMessages([...messages, newMessage]); // Append the new message to the list
-      setTableHeaders(response.data.tableHeaders);
-      setTableData(response.data.tableData);
-      setAnalyticsDesc(''); // Clear the prompt input after submit
-      setLastQuery(response.data.query);
-    })
-    .catch(error => console.error('Error analyzing data:', error));
+      .then(response => {
+        // Add a new message to the chat-style UI
+        const newMessage = {
+          description: analyticsDesc,
+          datasets: selectedDatasets,
+          query: response.data.query,
+          nlresponse: response.data.naturalResponse,
+          tableHeaders: response.data.tableHeaders,
+          tableData: response.data.tableData,
+          graphLabels: response.data.graphData.labels,
+          graphDataset: response.data.graphData.datasets
+        };
+        setMessages([...messages, newMessage]);
+        setTableHeaders(response.data.tableHeaders);
+        setTableData(response.data.tableData);
+        setAnalyticsDesc('');
+        setLastQuery(response.data.query);
+
+        setTimeout(() => {
+          if (lastMessageRef.current) {
+            lastMessageRef.current.scrollIntoView({ behavior: 'smooth' });
+          }
+        }, 0);
+      })
+      .catch(error => console.error('Error analyzing data:', error));
   };
 
   // Convert table data to CSV format and trigger download
@@ -128,7 +159,7 @@ function App() {
           {filteredDatasets.map(dataset => (
             <li
               key={dataset.id}
-              className={`p-2 mb-2 cursor-pointer rounded-md select-none ${selectedDatasets.includes(dataset.name) ? 'bg-blue-200' : 'bg-white hover:bg-blue-100'}`}
+              className={`p-2 mb-2 cursor-pointer rounded-md select-none ${selectedDatasets.includes(dataset.name) ? 'bg-blue-800 text-white' : 'bg-white hover:bg-blue-200'}`}
               onClick={() => toggleDataset(dataset.name)}
               style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
             >
@@ -144,15 +175,32 @@ function App() {
         style={{ width: '5px', marginLeft: sidebarWidth }}
       ></div>
 
-      <div className="flex-1 p-6 overflow-auto" style={{marginLeft: `${sidebarWidth + 5}px` }}>
-        <div className="flex justify-center items-center mb-6">
+      <div className="flex-1 overflow-auto" style={{ marginLeft: `${sidebarWidth + 5}px` }}>
+        <div className="flex justify-center items-center mb-6 mt-6">
           <img src={logo} alt="App Logo" className="h-10 w-10 mr-2" />
           <h1 className="text-3xl font-bold text-blue-600">Data Insights</h1>
         </div>
 
-        <div className="chat-messages space-y-4 mb-8">
+        <div className="chat-messages space-y-10 pb-32 ml-32 mr-32"> 
           {messages.map((message, index) => (
-            <div key={index} className="bg-white shadow-md rounded-lg p-6">
+            <div key={index} className="bg-white shadow-md rounded-lg p-6" ref={index === messages.length - 1 ? lastMessageRef : null}>
+              <div className="mb-2">
+                <h3 className="text-lg font-semibold">Prompt</h3>
+                <p>{message.description || 'N/A'}</p>
+              </div>
+              <div className="mb-6">
+                <div className="flex flex-wrap gap-2">
+                  {message.datasets.length ? message.datasets.map((dataset, i) => (
+                    <span key={i} className="bg-blue-200 text-blue-800 px-2 py-1 rounded-full text-sm">
+                      {dataset}
+                    </span>
+                  )) : 'Datasets not selected'}
+                </div>
+              </div>
+              <div className="mb-2">
+                <p>{message.nlresponse}</p>              
+              </div>
+
               <div className="flex justify-between items-center mb-4 mt-4">
                 <h3 className="text-lg font-semibold">Graph</h3>
                 <i
@@ -218,7 +266,7 @@ function App() {
                       onClick={() => setIsFullScreen(!isFullScreen)}
                       className="text-gray-500 underline hover:text-blue-500"
                     >
-                      {isFullScreen ? <i className="fa-solid fa-compress" title="Collapse"/> : <i className="fa-solid fa-expand" title="Fullscreen"/>}
+                      {isFullScreen ? <i className="fa-solid fa-compress" title="Collapse" /> : <i className="fa-solid fa-expand" title="Fullscreen" />}
                     </button>
                   </div>
                 </div>
@@ -230,7 +278,7 @@ function App() {
           ))}
         </div>
 
-        <div className="input-container flex justify-center mb-8">
+        <div className="input-container flex justify-center fixed bottom-0 left-0px bg-white p-4 border-t border-gray-300" style={{ width: `calc(100vw - ${sidebarWidth + 5}px)` }}>
           <input
             type="text"
             placeholder="Enter query and Shift+Enter to submit"
@@ -245,7 +293,7 @@ function App() {
           />
           <button
             onClick={handleSubmit}
-            className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-md ml-2"
+            className="bg-blue-800 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-md ml-2"
           >
             Submit
           </button>
