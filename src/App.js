@@ -9,6 +9,7 @@ import {
   LineElement, 
   BarElement, 
   BarController, // Import BarController
+  ScatterController,
   Title, 
   Tooltip, 
   Legend 
@@ -24,6 +25,7 @@ ChartJS.register(
   LineElement, 
   BarElement, 
   BarController, // Register BarController
+  ScatterController,
   Title, 
   Tooltip, 
   Legend
