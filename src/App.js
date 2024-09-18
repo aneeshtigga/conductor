@@ -17,6 +17,7 @@ import {
 import html2canvas from 'html2canvas';
 import logo from './stars.svg';
 import { saveAs } from 'file-saver';
+import './index.css';
 
 ChartJS.register(
   CategoryScale, 
@@ -32,73 +33,79 @@ ChartJS.register(
 );
 
 function App() {
-  const [datasets, setDatasets] = useState([]);
+  const [datasets, setDatasets] = useState({ database: [], s3: [], kafka: [] });
+  const [activeDatasetType, setActiveDatasetType] = useState('database'); // State to toggle dataset type
   const [selectedDatasets, setSelectedDatasets] = useState([]);
   const [analyticsDesc, setAnalyticsDesc] = useState('');
-  const [messages, setMessages] = useState([]); // Chat-style messages state
+  const [messages, setMessages] = useState([]);
   const [lastQuery, setLastQuery] = useState('');
   const [tableHeaders, setTableHeaders] = useState([]);
   const [tableData, setTableData] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(300);
+  const [isLoading, setIsLoading] = useState(false); // Add this line
 
   const lastMessageRef = useRef(null);
-  // Fetch datasets dynamically
+
   useEffect(() => {
     axios.get('http://localhost:4000/api/datasets')
       .then(response => setDatasets(response.data))
       .catch(error => console.error('Error fetching datasets:', error));
   }, []);
 
-  // Toggle dataset selection
   const toggleDataset = (dataset) => {
-    if (selectedDatasets.includes(dataset)) {
-      setSelectedDatasets(selectedDatasets.filter(d => d !== dataset));
+    const datasetString = `${dataset.type}: ${dataset.name}`;
+    if (selectedDatasets.includes(datasetString)) {
+      setSelectedDatasets(selectedDatasets.filter(d => d !== datasetString));
     } else {
-      setSelectedDatasets([...selectedDatasets, dataset]);
+      setSelectedDatasets([...selectedDatasets, datasetString]);
     }
   };
 
-  // Handle form submission
   const handleSubmit = () => {
+    setIsLoading(true); // Set loading state to true before API call
+  
     axios.post('http://localhost:4000/api/analyze', {
-      datasets: selectedDatasets,
-      description: analyticsDesc,
-      query: lastQuery
+      dataset: selectedDatasets,
+      question: analyticsDesc,
+      original_query: lastQuery
     })
-      .then(response => {
-        // Add a new message to the chat-style UI
-        const newMessage = {
-          description: analyticsDesc,
-          datasets: selectedDatasets,
-          query: response.data.query,
-          nlresponse: response.data.naturalResponse,
-          tableHeaders: response.data.tableHeaders,
-          tableData: response.data.tableData,
-          graphLabels: response.data.graphData.labels,
-          graphDataset: response.data.graphData.datasets
-        };
-        setMessages([...messages, newMessage]);
-        setTableHeaders(response.data.tableHeaders);
-        setTableData(response.data.tableData);
-        setAnalyticsDesc('');
-        setLastQuery(response.data.query);
-
-        setTimeout(() => {
-          if (lastMessageRef.current) {
-            lastMessageRef.current.scrollIntoView({ behavior: 'smooth' });
-          }
-        }, 0);
-      })
-      .catch(error => console.error('Error analyzing data:', error));
+    .then(response => {
+      const newMessage = {
+        description: analyticsDesc,
+        datasets: selectedDatasets,
+        query: response.data.query,
+        nlresponse: response.data.answer_text,
+        tableHeaders: response.data.tableHeaders,
+        tableData: JSON.parse(response.data.tableData.replace(/[\n\\]/g, '')),
+        graphLabels: JSON.parse(response.data.graphData.replace(/[\n\\]/g, '')).labels,
+        graphDataset: JSON.parse(response.data.graphData.replace(/[\n\\]/g, '')).datasets
+      };
+      setMessages([...messages, newMessage]);
+      setTableHeaders(response.data.tableHeaders);
+      setTableData(response.data.tableData);
+      setAnalyticsDesc('');
+      setLastQuery(response.data.query);
+  
+      setTimeout(() => {
+        if (lastMessageRef.current) {
+          lastMessageRef.current.scrollIntoView({ behavior: 'smooth' });
+        }
+      }, 0);
+    })
+    .catch(error => console.error('Error analyzing data:', error))
+    .finally(() => setIsLoading(false)); // Reset loading state after API call
   };
 
-  // Convert table data to CSV format and trigger download
+  console.log(tableData)
+
+
   const downloadTableAsCSV = () => {
     const header = tableHeaders.join(',');
-    const rows = tableData.map(row => tableHeaders.map(header => row[header.toLowerCase()]).join(',')).join('\n');
-    const csvContent = `data:text/csv;charset=utf-8,${header}\n${rows}`;
+    const rows = tableData.map(row => tableHeaders.map(header => row[header.toLowerCase()]).join(',')).join('');
+    const csvContent = `data:text/csv;charset=utf-8,${header}
+${rows}`;
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
     link.setAttribute('href', encodedUri);
@@ -107,7 +114,6 @@ function App() {
     link.click();
   };
 
-  // Convert graph to image and download
   const downloadGraphAsImage = () => {
     html2canvas(document.querySelector('.chart-container')).then(canvas => {
       canvas.toBlob(blob => {
@@ -116,19 +122,16 @@ function App() {
     });
   };
 
-  // Copy query to clipboard
   const copyQueryToClipboard = () => {
     navigator.clipboard.writeText(lastQuery)
       .then(() => alert('Query copied to clipboard!'))
       .catch(err => console.error('Failed to copy query: ', err));
   };
 
-  // Filter datasets based on search query
-  const filteredDatasets = datasets.filter(dataset =>
+  const filteredDatasets = datasets[activeDatasetType].filter(dataset =>
     dataset.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  // Handlers for resizing
   const startResizing = (e) => {
     window.addEventListener('mousemove', resizing);
     window.addEventListener('mouseup', stopResizing);
@@ -149,7 +152,30 @@ function App() {
         className="h-screen bg-white text-black p-4 shadow-md overflow-y-auto fixed"
         style={{ width: sidebarWidth }}
       >
-        <h2 className="text-1xl font-bold mb-4">Datasets</h2>
+        <div className="flex items-center mb-4">
+          <h2 className="text-1xl font-bold">Datasets</h2>
+          <div className="tabs flex ml-auto text-sm">
+            <button
+              className={`mr-2 py-1 px-3 rounded ${activeDatasetType === 'database' ? 'bg-blue-800 text-white' : 'bg-gray-200 text-gray-600'}`}
+              onClick={() => setActiveDatasetType('database')}
+            >
+              Database
+            </button>
+            <button
+              className={`mr-2 py-1 px-3 rounded ${activeDatasetType === 's3' ? 'bg-blue-800 text-white' : 'bg-gray-200 text-gray-600'}`}
+              onClick={() => setActiveDatasetType('s3')}
+            >
+              S3
+            </button>
+            <button
+              className={`py-1 px-3 rounded ${activeDatasetType === 'kafka' ? 'bg-blue-800 text-white' : 'bg-gray-200 text-gray-600'}`}
+              onClick={() => setActiveDatasetType('kafka')}
+            >
+              Kafka
+            </button>
+          </div>
+        </div>
+
         <input
           type="text"
           placeholder="Search by Name"
@@ -161,11 +187,11 @@ function App() {
           {filteredDatasets.map(dataset => (
             <li
               key={dataset.id}
-              className={`p-2 mb-2 cursor-pointer rounded-md select-none ${selectedDatasets.includes(dataset.name) ? 'bg-blue-800 text-white' : 'bg-white hover:bg-blue-200'}`}
-              onClick={() => toggleDataset(dataset.name)}
+              className={`p-2 mb-2 cursor-pointer rounded-md select-none ${selectedDatasets.includes(`${dataset.type}: ${dataset.name}`) ? 'bg-blue-800 text-white' : 'bg-white hover:bg-blue-200'}`}
+              onClick={() => toggleDataset(dataset)}
               style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
             >
-              {dataset.name}
+              {`${dataset.name}`}
             </li>
           ))}
         </ul>
@@ -235,24 +261,26 @@ function App() {
                 />
               </div>
               <div style={{ overflowX: 'auto' }}>
-                <table className="min-w-full bg-gray-100 border border-gray-300 rounded-md mb-4">
-                  <thead className="bg-gray-200 text-gray-600">
-                    <tr>
-                      {message.tableHeaders.map((header, i) => (
-                        <th key={i} className="py-2 px-4 border-b">{header}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {message.tableData.map((row, rowIndex) => (
-                      <tr key={rowIndex} className="text-center">
-                        {Object.values(row).map((value, colIndex) => (
-                          <td key={colIndex} className="py-2 px-4 border-b">{value}</td>
+                <div style={{ maxHeight: '400px', overflowY: 'auto', marginBottom: '1rem' }}>
+                  <table className="min-w-full bg-gray-100 border border-gray-300 rounded-md mb-4">
+                    <thead className="bg-gray-200 text-gray-600">
+                      <tr>
+                        {message.tableHeaders.map((header, i) => (
+                          <th key={i} className="py-2 px-4 border-b">{header}</th>
                         ))}
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {message.tableData.map((row, rowIndex) => (
+                        <tr key={rowIndex} className="text-center">
+                          {Object.values(row).map((value, colIndex) => (
+                            <td key={colIndex} className="py-2 px-4 border-b">{value}</td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
 
               <div className={`flex-1 overflow-y-auto ${isFullScreen ? 'fixed inset-0 bg-white z-50 p-8' : 'max-h-[calc(100vh-400px)]'}`}>
@@ -292,13 +320,17 @@ function App() {
               }
             }}
             className="border border-gray-300 rounded-md p-2 flex-grow"
+            disabled={isLoading} // Disable input while loading
           />
           <button
             onClick={handleSubmit}
             className="bg-blue-800 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-md ml-2"
+            disabled={isLoading} // Disable button while loading
           >
+            {isLoading && <span className="loader"></span>}
             Submit
           </button>
+          {isLoading && <div className="loading-overlay">Loading...</div>}
         </div>
       </div>
     </div>
