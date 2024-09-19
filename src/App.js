@@ -64,6 +64,11 @@ function App() {
   };
 
   const handleSubmit = () => {
+    if (!analyticsDesc) {
+      alert('Please select datasets and enter the query'); // Basic validation
+      return;
+    }
+  
     setIsLoading(true); // Set loading state to true before API call
   
     axios.post('http://localhost:4000/api/analyze', {
@@ -78,13 +83,13 @@ function App() {
         query: response.data.query,
         nlresponse: response.data.answer_text,
         tableHeaders: response.data.tableHeaders,
-        tableData: JSON.parse(response.data.tableData.replace(/[\n\\]/g, '')),
+        tableData: JSON.parse(response.data.tableData.replace(/[\n\r]/g, '')),
         graphLabels: JSON.parse(response.data.graphData.replace(/[\n\\]/g, '')).labels,
         graphDataset: JSON.parse(response.data.graphData.replace(/[\n\\]/g, '')).datasets
       };
       setMessages([...messages, newMessage]);
       setTableHeaders(response.data.tableHeaders);
-      setTableData(response.data.tableData);
+      setTableData(newMessage.tableData);
       setAnalyticsDesc('');
       setLastQuery(response.data.query);
   
@@ -101,9 +106,8 @@ function App() {
 
   const downloadTableAsCSV = () => {
     const header = tableHeaders.join(',');
-    const rows = tableData.map(row => tableHeaders.map(header => row[header.toLowerCase()]).join(',')).join('');
-    const csvContent = `data:text/csv;charset=utf-8,${header}
-${rows}`;
+    const rows = tableData.map(row => tableHeaders.map(header => row[header]).join(',')).join('\n'); // Add \n to join rows
+    const csvContent = `data:text/csv;charset=utf-8,${header}\n${rows}`;
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
     link.setAttribute('href', encodedUri);
