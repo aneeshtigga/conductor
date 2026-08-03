@@ -49,6 +49,7 @@ function App() {
   const [isLoading, setIsLoading] = useState(false); // Add this line
   const [error, setError] = useState(null); // user-facing error message
   const [sidebarOpen, setSidebarOpen] = useState(false); // mobile sidebar toggle
+  const [apiKey, setApiKey] = useState(() => localStorage.getItem('anthropicKey') || ''); // BYOK
 
   const lastMessageRef = useRef(null);
 
@@ -83,6 +84,8 @@ function App() {
       dataset: selectedDatasets,
       question: analyticsDesc,
       original_query: lastQuery
+    }, {
+      headers: apiKey ? { 'x-anthropic-api-key': apiKey } : {}
     })
     .then(response => {
       const newMessage = {
@@ -201,6 +204,25 @@ function App() {
           onChange={e => setSearchQuery(e.target.value)}
           className="border border-gray-300 rounded-md p-2 w-full mb-4"
         />
+        <div className="mb-4 border border-gray-200 rounded-md p-3 bg-gray-50">
+          <label className="block text-xs font-semibold text-gray-600 mb-1">
+            Anthropic API key
+          </label>
+          <input
+            type="password"
+            placeholder="sk-ant-... (stored in your browser only)"
+            value={apiKey}
+            onChange={e => {
+              setApiKey(e.target.value);
+              localStorage.setItem('anthropicKey', e.target.value);
+            }}
+            className="border border-gray-300 rounded-md p-2 w-full text-sm"
+          />
+          <p className="text-xs text-gray-400 mt-1">
+            Sent only with your requests; never stored on the server. Leave blank if the server has a key.
+          </p>
+        </div>
+
         <ul>
           {filteredDatasets.map(dataset => (
             <li
