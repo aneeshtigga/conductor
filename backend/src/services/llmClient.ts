@@ -13,16 +13,37 @@ import { AppError } from '../lib/errors.js'
 const MODEL = 'claude-sonnet-4-20250514'
 const PROVIDER = (process.env.LLM_PROVIDER || 'anthropic').toLowerCase()
 
-/** Ask the model to complete `user` under instructions `system`. Returns raw text. */
-export async function complete(system: string, user: string, maxTokens = 500): Promise<string> {
+/**
+ * Ask the model to complete `user` under instructions `system`. Returns raw text.
+ * If `userKey` is supplied (BYOK — the caller entered their own key in the app), it is used
+ * with the SDK regardless of LLM_PROVIDER. Otherwise the configured provider is used.
+ */
+export async function complete(
+  system: string,
+  user: string,
+  maxTokens = 500,
+  userKey?: string,
+): Promise<string> {
+  if (userKey) return completeViaSdk(system, user, maxTokens, userKey)
   return PROVIDER === 'cli'
     ? completeViaCli(system, user)
     : completeViaSdk(system, user, maxTokens)
 }
 
-function completeViaSdk(system: string, user: string, maxTokens: number): Promise<string> {
-  const apiKey = process.env.ANTHROPIC_API_KEY
-  if (!apiKey) throw new AppError('AI is not configured', 'AI_UNCONFIGURED', 500)
+function completeViaSdk(
+  system: string,
+  user: string,
+  maxTokens: number,
+  userKey?: string,
+): Promise<string> {
+  const apiKey = userKey || process.env.ANTHROPIC_API_KEY
+  if (!apiKey) {
+    throw new AppError(
+      'No API key. Enter your Anthropic API key in the app, or configure the server.',
+      'AI_UNCONFIGURED',
+      401,
+    )
+  }
   const client = new Anthropic({ apiKey })
   return client.messages
     .create({

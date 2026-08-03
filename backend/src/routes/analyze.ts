@@ -15,14 +15,17 @@ router.post('/analyze', async (req, res, next) => {
     }
     const datasets: string[] = Array.isArray(dataset) ? dataset : []
 
+    // BYOK: user may supply their own Anthropic key via header. Used transiently, never stored/logged.
+    const headerKey = req.header('x-anthropic-api-key') || undefined
+
     // 1. NL -> SQL (Claude)
-    const query = await generateSql(question, SCHEMA_DDL, datasets)
+    const query = await generateSql(question, SCHEMA_DDL, datasets, headerKey)
 
     // 2. Guard + execute (read-only)
     const { tableHeaders, tableData } = await run(query)
 
     // 3. Narrative + chart shaping
-    const answer_text = await summarise(question, tableData)
+    const answer_text = await summarise(question, tableData, headerKey)
     const graph = toGraphData(tableData, tableHeaders)
 
     // 4. Respond in the exact shape the existing frontend parses.
