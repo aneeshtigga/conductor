@@ -17,6 +17,7 @@ import {
 import html2canvas from 'html2canvas';
 import logo from './stars.svg';
 import { saveAs } from 'file-saver';
+import { API_URL } from './config';
 import './index.css';
 
 ChartJS.register(
@@ -49,7 +50,7 @@ function App() {
   const lastMessageRef = useRef(null);
 
   useEffect(() => {
-    axios.get('http://localhost:4000/api/datasets')
+    axios.get(`${API_URL}/api/datasets`)
       .then(response => setDatasets(response.data))
       .catch(error => console.error('Error fetching datasets:', error));
   }, []);
@@ -71,7 +72,7 @@ function App() {
   
     setIsLoading(true); // Set loading state to true before API call
   
-    axios.post('http://localhost:4000/api/analyze', {
+    axios.post(`${API_URL}/api/analyze`, {
       dataset: selectedDatasets,
       question: analyticsDesc,
       original_query: lastQuery
