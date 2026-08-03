@@ -16,9 +16,16 @@ Node 20 · Express 4 · TypeScript 5 · `@anthropic-ai/sdk` (claude-sonnet-4) ·
 
 Errors: `{ error, code }`.
 
+## LLM provider
+- `LLM_PROVIDER=cli` — shells to the local `claude` CLI (uses your Claude Code auth; **no API key**).
+  Works only where the CLI is installed + logged in (i.e. your machine), so use it for local dev/demo.
+- `LLM_PROVIDER=anthropic` (default) — uses the Anthropic SDK + `ANTHROPIC_API_KEY`; required for cloud
+  deploys (Railway) where no `claude` CLI exists.
+
 ## Environment
 Copy `.env.example` → `.env`:
-- `ANTHROPIC_API_KEY` — backend only, never exposed to the frontend.
+- `LLM_PROVIDER` — `cli` or `anthropic`.
+- `ANTHROPIC_API_KEY` — required only when `LLM_PROVIDER=anthropic`. Backend only, never exposed to the frontend.
 - `DATABASE_URL` — full-privilege connection, used only for seeding.
 - `DATABASE_URL_READONLY` — read-only role, used at request time.
 - `FRONTEND_URL` — CORS allow-list origin.
