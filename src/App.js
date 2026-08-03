@@ -19,6 +19,7 @@ import logo from './stars.svg';
 import { saveAs } from 'file-saver';
 import { API_URL } from './config';
 import './index.css';
+import './responsive.css';
 
 ChartJS.register(
   CategoryScale, 
@@ -46,13 +47,18 @@ function App() {
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(300);
   const [isLoading, setIsLoading] = useState(false); // Add this line
+  const [error, setError] = useState(null); // user-facing error message
+  const [sidebarOpen, setSidebarOpen] = useState(false); // mobile sidebar toggle
 
   const lastMessageRef = useRef(null);
 
   useEffect(() => {
     axios.get(`${API_URL}/api/datasets`)
       .then(response => setDatasets(response.data))
-      .catch(error => console.error('Error fetching datasets:', error));
+      .catch(err => {
+        console.error('Error fetching datasets:', err);
+        setError("Couldn't load datasets. The service may be starting up — please refresh in a moment.");
+      });
   }, []);
 
   const toggleDataset = (dataset) => {
@@ -66,10 +72,11 @@ function App() {
 
   const handleSubmit = () => {
     if (!analyticsDesc) {
-      alert('Please select datasets and enter the query'); // Basic validation
+      setError('Please type a question before submitting.');
       return;
     }
-  
+
+    setError(null);
     setIsLoading(true); // Set loading state to true before API call
   
     axios.post(`${API_URL}/api/analyze`, {
@@ -100,7 +107,15 @@ function App() {
         }
       }, 0);
     })
-    .catch(error => console.error('Error analyzing data:', error))
+    .catch(err => {
+      console.error('Error analyzing data:', err);
+      const apiMsg = err?.response?.data?.error;
+      setError(
+        apiMsg
+          ? `That question couldn't be answered: ${apiMsg}. Try rephrasing it or picking different datasets.`
+          : "Something went wrong while analysing. Please try again in a moment."
+      );
+    })
     .finally(() => setIsLoading(false)); // Reset loading state after API call
   };
 
@@ -152,7 +167,7 @@ function App() {
   return (
     <div className="flex bg-gray-50 h-screen text-gray-800">
       <div
-        className="h-screen bg-white text-black p-4 shadow-md overflow-y-auto fixed"
+        className={`app-sidebar h-screen bg-white text-black p-4 shadow-md overflow-y-auto fixed ${sidebarOpen ? 'open' : ''}`}
         style={{ width: sidebarWidth }}
       >
         <div className="flex items-center mb-4">
@@ -201,18 +216,43 @@ function App() {
       </div>
 
       <div
-        className="resizer bg-gray-300 custom-resize h-screen fixed select-none"
+        className="app-resizer resizer bg-gray-300 custom-resize h-screen fixed select-none"
         onMouseDown={startResizing}
         style={{ width: '5px', marginLeft: sidebarWidth }}
       ></div>
 
-      <div className="flex-1 overflow-auto" style={{ marginLeft: `${sidebarWidth + 5}px` }}>
+      <div className="app-main flex-1 overflow-auto" style={{ marginLeft: `${sidebarWidth + 5}px` }}>
+        <button
+          className="mobile-toggle fixed top-3 left-3 z-50 bg-blue-800 text-white rounded-md p-2"
+          onClick={() => setSidebarOpen(!sidebarOpen)}
+          aria-label="Toggle datasets panel"
+        >
+          <i className={`fas ${sidebarOpen ? 'fa-xmark' : 'fa-bars'}`} />
+        </button>
+
         <div className="flex justify-center items-center mb-6 mt-6">
           <img src={logo} alt="App Logo" className="h-8 w-8 mr-4" />
           <h1 className="text-3xl font-bold text-blue-800">Data Insights</h1>
         </div>
 
-        <div className="chat-messages space-y-10 pb-32 ml-32 mr-32"> 
+        {error && (
+          <div className="chat-pad mb-6 flex items-start justify-between bg-red-50 border border-red-200 text-red-800 rounded-md p-4">
+            <span>{error}</span>
+            <button onClick={() => setError(null)} className="ml-4 text-red-500 hover:text-red-700" aria-label="Dismiss">
+              <i className="fas fa-xmark" />
+            </button>
+          </div>
+        )}
+
+        {messages.length === 0 && !isLoading && !error && (
+          <div className="chat-pad text-center text-gray-500 mt-20">
+            <i className="fas fa-chart-line text-4xl mb-4 text-blue-200" />
+            <p className="text-lg">Select datasets, then ask a question in plain English.</p>
+            <p className="text-sm mt-2">e.g. "What were the top 5 products by revenue?"</p>
+          </div>
+        )}
+
+        <div className="chat-messages chat-pad space-y-10 pb-32">
           {messages.map((message, index) => (
             <div key={index} className="bg-white shadow-md rounded-lg p-6" ref={index === messages.length - 1 ? lastMessageRef : null}>
               <div className="mb-2">
@@ -311,7 +351,7 @@ function App() {
           ))}
         </div>
 
-        <div className="input-container flex justify-center fixed bottom-0 left-0px bg-white p-4 border-t border-gray-300" style={{ width: `calc(100vw - ${sidebarWidth + 5}px)` }}>
+        <div className="app-input-container input-container flex justify-center fixed bottom-0 left-0px bg-white p-4 border-t border-gray-300" style={{ width: `calc(100vw - ${sidebarWidth + 5}px)` }}>
           <input
             type="text"
             placeholder="Enter query and Shift+Enter to submit"
