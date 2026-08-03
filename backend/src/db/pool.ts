@@ -11,10 +11,14 @@ if (!connectionString) {
   throw new Error('DATABASE_URL_READONLY (or DATABASE_URL) must be set')
 }
 
+/** Managed Postgres (Supabase etc.) needs SSL even in local dev. */
+const needsSsl =
+  process.env.NODE_ENV === 'production' ||
+  /supabase\.co|sslmode=require|render\.com|neon\.tech/i.test(connectionString)
+
 export const readPool = new Pool({
   connectionString,
-  // Supabase and most managed Postgres require SSL in production.
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : undefined,
+  ssl: needsSsl ? { rejectUnauthorized: false } : undefined,
   max: 5,
   statement_timeout: 10_000,
 })

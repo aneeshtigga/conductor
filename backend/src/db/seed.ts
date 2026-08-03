@@ -34,7 +34,12 @@ const LAST = ['Patel', 'Kim', 'Garcia', 'Nguyen', 'Smith', 'Okafor', 'Muller', '
 
 async function main() {
   const { Pool } = pg
-  const pool = new Pool({ connectionString: process.env.DATABASE_URL })
+  const connectionString = process.env.DATABASE_URL
+  const needsSsl = /supabase\.co|sslmode=require|render\.com|neon\.tech/i.test(connectionString || '')
+  const pool = new Pool({
+    connectionString,
+    ssl: needsSsl ? { rejectUnauthorized: false } : undefined,
+  })
 
   const schema = readFileSync(join(__dirname, 'schema.sql'), 'utf8')
   console.log('Applying schema...')
